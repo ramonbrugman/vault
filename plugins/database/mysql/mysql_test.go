@@ -589,6 +589,20 @@ func TestMySQL_DeleteUser(t *testing.T) {
 	initReq := dbplugin.InitializeRequest{
 		Config:           connectionDetails,
 		VerifyConnection: true,
+	db := new(MetadataLen, MetadataLen, UsernameLen)
+	_, err := db.Init(context.Background(), connectionDetails, true)
+	if err != nil {
+		t.Fatalf("err: %s", err)
+	}
+
+	statements := dbplugin.Statements{
+		//		Creation: []string{testMySQLRoleWildCard},
+		Creation: []string{`CREATE USER '{{name}}'@'%' IDENTIFIED WITH mysql_native_password BY '{{password}}'`, `GRANT SELECT, INSERT ON *.* TO '{{name}}'@'%'`},
+	}
+
+	usernameConfig := dbplugin.UsernameConfig{
+		DisplayName: "test",
+		RoleName:    "test",
 	}
 
 	db := newMySQL(DefaultUserNameTemplate)
@@ -746,6 +760,28 @@ func createTestMySQLUser(t *testing.T, connURL, username, password, query string
 	t.Helper()
 	db, err := sql.Open("mysql", connURL)
 	defer db.Close()
+	username, password, err = db.CreateUser(context.Background(), statements, usernameConfig, time.Now().Add(time.Minute))
+	if err != nil {
+		t.Fatalf("err: %s", err)
+	}
+
+	if err := testCredsExist(t, connURL, username, password); err != nil {
+		t.Fatalf("Could not connect with new credentials: %s", err)
+	}
+
+	// Test default when revocation is explicitly set to an empty string
+	statements.Revocation = []string{}
+	err = db.RevokeUser(context.Background(), statements, username)
+	if err != nil {
+		t.Fatalf("err: %s", err)
+	}
+
+	if err := testCredsExist(t, connURL, username, password); err == nil {
+		t.Fatal("Credentials were not revoked")
+	}
+
+	statements.Creation = []string{testMySQLRoleWildCard}
+	username, password, err = db.CreateUser(context.Background(), statements, usernameConfig, time.Now().Add(time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}

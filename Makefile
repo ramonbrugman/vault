@@ -208,6 +208,7 @@ proto:
 fmtcheck:
 	@true
 #@sh -c "'$(CURDIR)/scripts/gofmtcheck.sh'"
+	#@sh -c "'$(CURDIR)/scripts/gofmtcheck.sh'"
 
 fmt:
 	find . -name '*.go' | grep -v pb.go | grep -v vendor | xargs gofumpt -w
